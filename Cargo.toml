@@ -1,0 +1,12 @@
+[workspace]
+resolver = "3"
+members = ["crates/avro-core", "crates/avro-repl", "crates/fcitx5-adapter"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/dreygur/avro-rs"
+authors = ["Rakibul Yeasin <ryeasin03@gmail.com>"]
+
+[workspace.dependencies]

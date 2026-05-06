@@ -1,0 +1,14 @@
+[package]
+name = "fcitx5-adapter"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+avro-core = { path = "../avro-core" }
+
+[build-dependencies]
+cc = "1"
+pkg-config = "0.3"
