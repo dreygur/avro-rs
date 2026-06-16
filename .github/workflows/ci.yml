@@ -95,3 +95,9 @@ jobs:
           key: ${{ runner.os }}-cargo-wasm-${{ hashFiles('Cargo.lock') }}
       - run: rustup target add wasm32-unknown-unknown
       - run: cargo build --target wasm32-unknown-unknown -p wasm-adapter
+      - run: cargo install wasm-bindgen-cli --version 0.2.125
+      - run: make wasm
+      - run: |
+          test -f crates/wasm-adapter/pkg/wasm_adapter.js
+          test -f crates/wasm-adapter/pkg/wasm_adapter_bg.wasm
+          test -f crates/wasm-adapter/pkg/package.json

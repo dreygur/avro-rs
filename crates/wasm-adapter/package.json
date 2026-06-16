@@ -1,0 +1,16 @@
+{
+  "name": "avro-phonetic-wasm",
+  "version": "0.1.0",
+  "description": "WebAssembly build of the Avro Phonetic Bangla transliteration engine",
+  "license": "MIT",
+  "repository": "https://github.com/dreygur/avro-rs",
+  "main": "wasm_adapter.js",
+  "module": "wasm_adapter.js",
+  "types": "wasm_adapter.d.ts",
+  "files": [
+    "wasm_adapter.js",
+    "wasm_adapter_bg.wasm",
+    "wasm_adapter.d.ts",
+    "package.json"
+  ]
+}

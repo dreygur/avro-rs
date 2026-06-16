@@ -100,7 +100,7 @@ C FFI (`src/lib.rs`, `avro_state_new`/`avro_handle_input`/`avro_commit`/... expo
 
 ### wasm-adapter (`crates/wasm-adapter`)
 
-`wasm-bindgen`-wrapped `AvroState` (`src/lib.rs`) exposing `new`/`handle_input`/`handle_backspace`/`commit`/`commit_suggestion`/`has_preedit`/`preedit`/`suggestions` — the same logical surface as `fcitx5-adapter`'s C FFI, minus manual string marshaling. The constructor takes the grammar/dict/suffix JSON/JS as plain strings (host page fetches `avro.json`/`avrodict.js`/`suffixdict.js` and passes them in) and delegates to `AvroEngine::from_sources`. Builds for `wasm32-unknown-unknown`; no JS glue package (`wasm-pack`/`wasm-bindgen-cli` output) generated yet.
+`wasm-bindgen`-wrapped `AvroState` (`src/lib.rs`) exposing `new`/`handle_input`/`handle_backspace`/`commit`/`commit_suggestion`/`has_preedit`/`preedit`/`suggestions` — the same logical surface as `fcitx5-adapter`'s C FFI, minus manual string marshaling. The constructor takes the grammar/dict/suffix JSON/JS as plain strings (host page fetches `avro.json`/`avrodict.js`/`suffixdict.js` and passes them in) and delegates to `AvroEngine::from_sources`. `make wasm` (root `Makefile`) builds the release `wasm32-unknown-unknown` target, runs `wasm-bindgen` (pinned to the exact version in `Cargo.lock`) with `--target web`, and copies `crates/wasm-adapter/package.json` into the generated `crates/wasm-adapter/pkg/` — the npm-installable package (`avro-phonetic-wasm`), gitignored since it's build output, not source. Verified end-to-end in a real browser (headless Chrome via Puppeteer): importing the generated `pkg/wasm_adapter.js` and typing produces correct Bangla output.
 
 ## Roadmap
 
@@ -111,7 +111,7 @@ C FFI (`src/lib.rs`, `avro_state_new`/`avro_handle_input`/`avro_commit`/... expo
 | 3 | Autosuggest: dict/suffix-dict lookup + suffix stripping | Done |
 | 4 | Fcitx5 FFI bridge + deployment to `/usr/lib64/fcitx5/` | Done |
 | 5 | TSF adapter (Windows) | Pending |
-| 6 | WASM adapter (Web) | In progress |
+| 6 | WASM adapter (Web) | Done |
 
 ## Phonetic accuracy notes
 

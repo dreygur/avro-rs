@@ -10,13 +10,23 @@ LIB_NAME     := libfcitx5-adapter.so
 
 PKGDATADIR   := $(FCITX5_DATA)/avro
 
-.PHONY: all build install uninstall clean
+WASM_PKG_DIR := crates/wasm-adapter/pkg
+
+.PHONY: all build install uninstall clean wasm
 
 all: build
 
 # Run as your regular user — cargo must not be invoked under sudo.
 build:
 	PKGDATADIR=$(PKGDATADIR) $(CARGO) build -p fcitx5-adapter --release
+
+# Builds the npm package for wasm-adapter into crates/wasm-adapter/pkg.
+# Requires 'wasm-bindgen-cli' installed at the version pinned in Cargo.lock.
+wasm:
+	$(CARGO) build --target wasm32-unknown-unknown --release -p wasm-adapter
+	wasm-bindgen target/wasm32-unknown-unknown/release/wasm_adapter.wasm \
+		--out-dir $(WASM_PKG_DIR) --target web
+	$(INSTALL) -Dm644 crates/wasm-adapter/package.json $(WASM_PKG_DIR)/package.json
 
 # Run as root (sudo make install). Requires 'make build' to have been run first.
 install: $(LIB_RELEASE)
