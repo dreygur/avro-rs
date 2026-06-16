@@ -218,4 +218,15 @@ public:
     }
 };
 
-FCITX_ADDON_FACTORY(AvroPhoneticFactory)
+// Hand-expanded instead of FCITX_ADDON_FACTORY(AvroPhoneticFactory): a plain
+// extern "C" symbol from this statically-linked object gets dropped from the
+// cdylib's dynamic symbol table at link time (nothing in Rust code references
+// it, so it's neither pulled in nor exported). Renamed and re-exported via a
+// #[no_mangle] Rust fn in lib.rs, which rustc's own cdylib export list does
+// include correctly.
+extern "C" {
+fcitx::AddonFactory *avro_fcitx_addon_factory_impl() {
+    static AvroPhoneticFactory factory;
+    return &factory;
+}
+}

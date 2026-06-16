@@ -159,3 +159,17 @@ fn load_engine(
         suffix_src.as_deref(),
     )
 }
+
+// fcitx5's SharedLibraryLoader looks up this exact symbol name via dlsym.
+// Re-exported from Rust (rather than directly from shim.cpp) because rustc's
+// cdylib export-list generation only picks up #[no_mangle] Rust items —
+// a plain extern "C" symbol from the statically-linked C++ object gets
+// dropped from the dynamic symbol table since nothing in Rust references it.
+unsafe extern "C" {
+    fn avro_fcitx_addon_factory_impl() -> *mut std::ffi::c_void;
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn fcitx_addon_factory_instance() -> *mut std::ffi::c_void {
+    unsafe { avro_fcitx_addon_factory_impl() }
+}
