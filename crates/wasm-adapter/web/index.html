@@ -1,0 +1,53 @@
+<!-- SPDX-License-Identifier: MPL-1.1 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Avro Typing Pad</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <h1>Avro Typing Pad</h1>
+    <label class="toggle">
+      <span>EN</span>
+      <input type="checkbox" id="lang-toggle" checked />
+      <span class="slider"></span>
+      <span>বাং</span>
+    </label>
+  </header>
+
+  <main class="main">
+    <section class="editor-col">
+      <div id="canvas" class="canvas" tabindex="0" aria-label="Typing canvas"></div>
+
+      <div id="suggestions" class="suggestions" aria-label="Suggestions"></div>
+
+      <div class="toolbar">
+        <button id="clear-btn" type="button">Clear</button>
+        <button id="copy-btn" type="button">Copy</button>
+        <button id="save-draft-btn" type="button">Save draft</button>
+        <span id="dict-status" class="dict-status">Loading suggestions&hellip;</span>
+      </div>
+    </section>
+
+    <aside class="drafts-col">
+      <h2>Drafts</h2>
+      <ul id="drafts-list" class="drafts-list"></ul>
+    </aside>
+  </main>
+
+  <footer class="footer">
+    <p>
+      This typing pad's interaction design was inspired by OmicronLab's
+      <a href="https://github.com/omicronlab/avro-pad" target="_blank" rel="noopener">AvroPad</a>,
+      reimplemented here from scratch on top of the Rust/WASM Avro engine.
+    </p>
+  </footer>
+</div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>

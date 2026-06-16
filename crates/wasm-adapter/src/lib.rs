@@ -61,6 +61,18 @@ impl AvroState {
     pub fn suggestions(&self) -> Vec<String> {
         self.suggestions.clone()
     }
+
+    pub fn load_dict(&mut self, dict_js: &str) {
+        if let Ok(dict) = avro_core::dict::WordDict::from_js(dict_js) {
+            self.engine.load_dict(dict);
+        }
+    }
+
+    pub fn load_suffix_dict(&mut self, suffix_js: &str) {
+        if let Ok(dict) = avro_core::dict::SuffixDict::from_js(suffix_js) {
+            self.engine.load_suffix_dict(dict);
+        }
+    }
 }
 
 impl AvroState {

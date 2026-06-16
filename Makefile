@@ -11,8 +11,9 @@ LIB_NAME     := libfcitx5-adapter.so
 PKGDATADIR   := $(FCITX5_DATA)/avro
 
 WASM_PKG_DIR := crates/wasm-adapter/pkg
+WEB_DATA_DIR := crates/wasm-adapter/web/data
 
-.PHONY: all build install uninstall clean wasm
+.PHONY: all build install uninstall clean wasm web
 
 all: build
 
@@ -27,6 +28,12 @@ wasm:
 	wasm-bindgen target/wasm32-unknown-unknown/release/wasm_adapter.wasm \
 		--out-dir $(WASM_PKG_DIR) --target web
 	$(INSTALL) -Dm644 crates/wasm-adapter/package.json $(WASM_PKG_DIR)/package.json
+
+# Builds the wasm package and stages the data files for the web UI.
+web: wasm
+	$(INSTALL) -Dm644 avro.json      $(WEB_DATA_DIR)/avro.json
+	$(INSTALL) -Dm644 avrodict.js    $(WEB_DATA_DIR)/avrodict.js
+	$(INSTALL) -Dm644 suffixdict.js  $(WEB_DATA_DIR)/suffixdict.js
 
 # Run as root (sudo make install). Requires 'make build' to have been run first.
 install: $(LIB_RELEASE)
