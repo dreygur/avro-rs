@@ -66,6 +66,21 @@ jobs:
           sudo apt-get install -y libfcitx5core-dev libfcitx5utils-dev
       - run: cargo build -p fcitx5-adapter
 
+  fcitx5-functional-test:
+    runs-on: ubuntu-latest
+    container: fedora:44
+    steps:
+      - run: dnf -y install dnf5 && dnf -y install fcitx5 fcitx5-devel gcc-c++ cargo rust pkgconf-pkg-config
+      - run: cp /usr/share/fcitx5/testing/addon/testfrontend.conf /usr/share/fcitx5/addon/testfrontend.conf
+      - uses: actions/checkout@v4
+      - run: make build && make install
+      - run: |
+          g++ -std=c++20 crates/fcitx5-adapter/tests/fcitx5_functional/avrotest.cpp \
+            $(pkg-config --cflags --libs Fcitx5Core) \
+            -I/usr/include/Fcitx5/Module/fcitx-module/testfrontend \
+            -o /tmp/avrotest
+      - run: /tmp/avrotest
+
   build-wasm-adapter:
     runs-on: ubuntu-latest
     steps:

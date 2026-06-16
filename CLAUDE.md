@@ -109,7 +109,7 @@ C FFI (`src/lib.rs`, `avro_state_new`/`avro_handle_input`/`avro_commit`/... expo
 | 1 | Engine foundation: trie + stateful traversal + backspace | Done |
 | 2 | JSON rule parser (`serde_json`) → trie insertions | Done |
 | 3 | Autosuggest: dict/suffix-dict lookup + suffix stripping | Done |
-| 4 | Fcitx5 FFI bridge + deployment to `/usr/lib64/fcitx5/` | In progress |
+| 4 | Fcitx5 FFI bridge + deployment to `/usr/lib64/fcitx5/` | Done |
 | 5 | TSF adapter (Windows) | Pending |
 | 6 | WASM adapter (Web) | In progress |
 
@@ -119,3 +119,4 @@ C FFI (`src/lib.rs`, `avro_state_new`/`avro_handle_input`/`avro_commit`/... expo
 - Backspace must revert Bangla output state, not just the Latin buffer — use `state_stack`.
 - Vowel form selection (`dependent` vs `independent`) is driven by `OutputContext`, not caller flags.
 - When fixing a transliteration mismatch, write a failing test against `avro.json`-driven (`from_grammar`) behavior first — both the hardcoded `load_rules()` path and the JSON path are tested in `engine.rs`, and they should agree.
+- `dist/addon/AvroPhonetic.conf` must set `Type=SharedLibrary` (fcitx5 silently skips the addon with no error if missing) and `Library=` must include the literal `lib` prefix (e.g. `libfcitx5-adapter`, not `fcitx5-adapter`) — fcitx5's addon loader does not auto-prepend it.
