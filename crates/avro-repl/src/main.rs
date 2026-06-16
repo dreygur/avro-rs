@@ -1,6 +1,9 @@
 use std::io::{self, Write};
 
-use avro_core::{dict::{SuffixDict, WordDict}, AvroEngine, AvroGrammar};
+use avro_core::{
+    AvroEngine, AvroGrammar,
+    dict::{SuffixDict, WordDict},
+};
 use crossterm::{
     cursor,
     event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers},
@@ -8,14 +11,28 @@ use crossterm::{
     terminal::{self, ClearType},
 };
 
-fn render(out: &mut io::Stdout, committed: &str, preedit: &str, suggestions: &[String]) -> io::Result<u16> {
-    execute!(out, cursor::MoveToColumn(0), terminal::Clear(ClearType::FromCursorDown))?;
+fn render(
+    out: &mut io::Stdout,
+    committed: &str,
+    preedit: &str,
+    suggestions: &[String],
+) -> io::Result<u16> {
+    execute!(
+        out,
+        cursor::MoveToColumn(0),
+        terminal::Clear(ClearType::FromCursorDown)
+    )?;
     write!(out, "> {committed}")?;
     if !preedit.is_empty() {
         write!(out, "\x1b[4m{preedit}\x1b[0m")?;
     }
     if !suggestions.is_empty() {
-        let hint = suggestions.iter().take(5).map(String::as_str).collect::<Vec<_>>().join("  ");
+        let hint = suggestions
+            .iter()
+            .take(5)
+            .map(String::as_str)
+            .collect::<Vec<_>>()
+            .join("  ");
         write!(out, "\r\n  \x1b[2m{hint}\x1b[0m")?;
         out.flush()?;
         return Ok(1);
@@ -67,7 +84,13 @@ fn main() -> io::Result<()> {
     let mut prev = render(&mut out, "", "", &[])?;
 
     loop {
-        let Event::Key(KeyEvent { code, modifiers, kind: KeyEventKind::Press, .. }) = event::read()? else {
+        let Event::Key(KeyEvent {
+            code,
+            modifiers,
+            kind: KeyEventKind::Press,
+            ..
+        }) = event::read()?
+        else {
             continue;
         };
         match (code, modifiers) {
@@ -76,20 +99,33 @@ fn main() -> io::Result<()> {
             (KeyCode::Backspace, _) => {
                 let p = engine.handle_backspace();
                 let s = engine.suggest_extended(5);
-                if prev > 0 { execute!(out, cursor::MoveUp(prev))?; }
+                if prev > 0 {
+                    execute!(out, cursor::MoveUp(prev))?;
+                }
                 prev = render(&mut out, &committed, &p, &s)?;
             }
             (KeyCode::Char(' '), _) => {
                 let word = engine.commit();
-                if !word.is_empty() { committed.push_str(&word); committed.push(' '); }
-                if prev > 0 { execute!(out, cursor::MoveUp(prev))?; }
+                if !word.is_empty() {
+                    committed.push_str(&word);
+                    committed.push(' ');
+                }
+                if prev > 0 {
+                    execute!(out, cursor::MoveUp(prev))?;
+                }
                 prev = render(&mut out, &committed, "", &[])?;
             }
             (KeyCode::Enter, _) => {
                 let word = engine.commit();
                 committed.push_str(&word);
-                if prev > 0 { execute!(out, cursor::MoveUp(prev))?; }
-                execute!(out, cursor::MoveToColumn(0), terminal::Clear(ClearType::FromCursorDown))?;
+                if prev > 0 {
+                    execute!(out, cursor::MoveUp(prev))?;
+                }
+                execute!(
+                    out,
+                    cursor::MoveToColumn(0),
+                    terminal::Clear(ClearType::FromCursorDown)
+                )?;
                 write!(out, "{committed}\r\n")?;
                 out.flush()?;
                 committed.clear();
@@ -98,15 +134,23 @@ fn main() -> io::Result<()> {
             (KeyCode::Char(c), _) => {
                 let p = engine.handle_input(c);
                 let s = engine.suggest_extended(5);
-                if prev > 0 { execute!(out, cursor::MoveUp(prev))?; }
+                if prev > 0 {
+                    execute!(out, cursor::MoveUp(prev))?;
+                }
                 prev = render(&mut out, &committed, &p, &s)?;
             }
             _ => {}
         }
     }
 
-    if prev > 0 { execute!(out, cursor::MoveUp(prev))?; }
-    execute!(out, cursor::MoveToColumn(0), terminal::Clear(ClearType::FromCursorDown))?;
+    if prev > 0 {
+        execute!(out, cursor::MoveUp(prev))?;
+    }
+    execute!(
+        out,
+        cursor::MoveToColumn(0),
+        terminal::Clear(ClearType::FromCursorDown)
+    )?;
     terminal::disable_raw_mode()?;
     writeln!(out)?;
     out.flush()

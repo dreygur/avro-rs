@@ -1,7 +1,9 @@
-use std::collections::HashMap;
 use crate::dict::{SuffixDict, WordDict};
 use crate::grammar::AvroGrammar;
-use crate::types::{BanglaOutput, CharClass, EngineState, MatchCond, OutputContext, ScopeCheck, TrieNode};
+use crate::types::{
+    BanglaOutput, CharClass, EngineState, MatchCond, OutputContext, ScopeCheck, TrieNode,
+};
+use std::collections::HashMap;
 
 pub struct AvroEngine {
     root: TrieNode,
@@ -59,6 +61,26 @@ impl AvroEngine {
         };
         for (find, output) in grammar.patterns_as_outputs() {
             engine.insert(find, output);
+        }
+        engine
+    }
+
+    /// Build an engine from optional source strings: JSON grammar, word-dict JS, suffix-dict JS.
+    /// Falls back to hardcoded rules if grammar is absent/invalid; dict/suffix are skipped if absent/invalid.
+    pub fn from_sources(
+        grammar_json: Option<&str>,
+        dict_js: Option<&str>,
+        suffix_js: Option<&str>,
+    ) -> Self {
+        let mut engine = match grammar_json.and_then(|s| AvroGrammar::from_json(s).ok()) {
+            Some(grammar) => Self::from_grammar(&grammar),
+            None => Self::new(),
+        };
+        if let Some(dict) = dict_js.and_then(|s| WordDict::from_js(s).ok()) {
+            engine.load_dict(dict);
+        }
+        if let Some(suffix) = suffix_js.and_then(|s| SuffixDict::from_js(s).ok()) {
+            engine.load_suffix_dict(suffix);
         }
         engine
     }
@@ -126,7 +148,8 @@ impl AvroEngine {
     }
 
     pub fn load_dict(&mut self, dict: WordDict) {
-        self.bangla_to_key = dict.keys()
+        self.bangla_to_key = dict
+            .keys()
             .filter_map(|key| {
                 let first_char = dict.words_for(key).first()?.chars().next()?;
                 Some((first_char, key.to_string()))
@@ -138,11 +161,12 @@ impl AvroEngine {
     pub fn load_suffix_dict(&mut self, dict: SuffixDict) {
         // Collect unique Bangla suffix strings, sorted longest first (by char count).
         let mut seen = std::collections::HashSet::new();
-        let mut bangla: Vec<String> = dict.bangla_values()
+        let mut bangla: Vec<String> = dict
+            .bangla_values()
             .filter(|s| seen.insert(s.to_string()))
             .map(String::from)
             .collect();
-        bangla.sort_by(|a, b| b.chars().count().cmp(&a.chars().count()));
+        bangla.sort_by_key(|b| std::cmp::Reverse(b.chars().count()));
         self.suffix_bangla_sorted = bangla;
         // SuffixDict itself is dropped here; we only needed the pre-sorted list.
     }
@@ -160,16 +184,25 @@ impl AvroEngine {
     /// Example: preedit "বাংলাদেশের" → strip "ের" → base "বাংলাদেশ" →
     ///   match words in WordDict → return ["বাংলাদেশ" + "ের", ...]
     pub fn suggest_extended(&self, max: usize) -> Vec<String> {
-        let Some(dict) = self.dict.as_ref() else { return vec![] };
+        let Some(dict) = self.dict.as_ref() else {
+            return vec![];
+        };
         let preedit = self.preedit();
-        if preedit.is_empty() { return vec![]; }
+        if preedit.is_empty() {
+            return vec![];
+        }
 
         for suffix in &self.suffix_bangla_sorted {
             if preedit.len() > suffix.len() && preedit.ends_with(suffix.as_str()) {
                 let base = &preedit[..preedit.len() - suffix.len()];
-                let Some(&first_char) = base.chars().next().as_ref() else { continue };
-                let Some(key) = self.bangla_to_key.get(&first_char) else { continue };
-                let candidates: Vec<String> = dict.words_for(key)
+                let Some(&first_char) = base.chars().next().as_ref() else {
+                    continue;
+                };
+                let Some(key) = self.bangla_to_key.get(&first_char) else {
+                    continue;
+                };
+                let candidates: Vec<String> = dict
+                    .words_for(key)
                     .iter()
                     .filter(|w| w.starts_with(base))
                     .take(max)
@@ -193,11 +226,19 @@ impl AvroEngine {
 
     // ── Internal helpers ──────────────────────────────────────────────────────
 
-    fn prefix_candidates<'a>(&'a self, preedit: &str, max: usize) -> Vec<String> {
-        let Some(dict) = self.dict.as_ref() else { return vec![] };
-        if preedit.is_empty() { return vec![]; }
-        let Some(first_char) = preedit.chars().next() else { return vec![] };
-        let Some(key) = self.bangla_to_key.get(&first_char) else { return vec![] };
+    fn prefix_candidates(&self, preedit: &str, max: usize) -> Vec<String> {
+        let Some(dict) = self.dict.as_ref() else {
+            return vec![];
+        };
+        if preedit.is_empty() {
+            return vec![];
+        }
+        let Some(first_char) = preedit.chars().next() else {
+            return vec![];
+        };
+        let Some(key) = self.bangla_to_key.get(&first_char) else {
+            return vec![];
+        };
         dict.words_for(key)
             .iter()
             .filter(|w| w.starts_with(preedit))
@@ -246,7 +287,9 @@ impl AvroEngine {
     /// `trigger` is the incoming char that caused the flush (used as suffix context
     /// for the last token in the prefix so JSON suffix conditions evaluate correctly).
     fn flush_prefix(&mut self, trigger: Option<char>) {
-        if self.prefix.is_empty() { return; }
+        if self.prefix.is_empty() {
+            return;
+        }
         let prefix = std::mem::take(&mut self.prefix);
         let mut byte_pos = 0;
         while byte_pos < prefix.len() {
@@ -259,7 +302,12 @@ impl AvroEngine {
                     } else {
                         trigger
                     };
-                    self.resolve(Some(output), self.context.clone(), next_roman, self.last_roman)
+                    self.resolve(
+                        Some(output),
+                        self.context.clone(),
+                        next_roman,
+                        self.last_roman,
+                    )
                 }
                 None => remaining.chars().next().unwrap().to_string(),
             };
@@ -293,7 +341,10 @@ impl AvroEngine {
 
         match best {
             Some((len, output)) => (len, Some(output)),
-            None => (s.chars().next().expect("trie_match on empty").len_utf8(), None),
+            None => (
+                s.chars().next().expect("trie_match on empty").len_utf8(),
+                None,
+            ),
         }
     }
 
@@ -310,13 +361,20 @@ impl AvroEngine {
         match output_opt {
             None => String::new(), // unreachable in normal use; callers handle literal path
             Some(BanglaOutput::Static(s)) => s,
-            Some(BanglaOutput::Contextual { independent, dependent }) => match ctx {
+            Some(BanglaOutput::Contextual {
+                independent,
+                dependent,
+            }) => match ctx {
                 OutputContext::Neutral => independent,
                 OutputContext::AfterConsonant => dependent,
             },
             Some(BanglaOutput::Conditional { rules, fallback }) => {
                 for rule in &rules {
-                    if rule.matches.iter().all(|cond| self.eval_cond(cond, &ctx, next_roman, last_roman)) {
+                    if rule
+                        .matches
+                        .iter()
+                        .all(|cond| self.eval_cond(cond, &ctx, next_roman, last_roman))
+                    {
                         return rule.replace.clone();
                     }
                 }
@@ -334,7 +392,9 @@ impl AvroEngine {
     ) -> bool {
         match cond {
             MatchCond::Prefix(scope) => self.check_scope(scope, last_roman, ctx),
-            MatchCond::Suffix(scope) => self.check_scope(scope, next_roman, &OutputContext::Neutral),
+            MatchCond::Suffix(scope) => {
+                self.check_scope(scope, next_roman, &OutputContext::Neutral)
+            }
         }
     }
 
@@ -356,12 +416,16 @@ impl AvroEngine {
                 None => *ctx == OutputContext::AfterConsonant,
             },
             CharClass::Vowel => roman.map(|c| self.vowel_chars.contains(c)).unwrap_or(false),
-            CharClass::Number => roman.map(|c| self.number_chars.contains(c)).unwrap_or(false),
+            CharClass::Number => roman
+                .map(|c| self.number_chars.contains(c))
+                .unwrap_or(false),
             CharClass::Punctuation => match roman {
                 None => true,
-                Some(c) => !self.consonant_chars.contains(c)
-                    && !self.vowel_chars.contains(c)
-                    && !self.number_chars.contains(c),
+                Some(c) => {
+                    !self.consonant_chars.contains(c)
+                        && !self.vowel_chars.contains(c)
+                        && !self.number_chars.contains(c)
+                }
             },
         }
     }
@@ -374,7 +438,8 @@ impl AvroEngine {
                     || cp == 0x09CE  // ৎ
                     || cp == 0x09DC  // ড়
                     || cp == 0x09DD  // ঢ়
-                    || cp == 0x09DF  // য়
+                    || cp == 0x09DF
+                // য়
                 {
                     OutputContext::AfterConsonant
                 } else {
@@ -387,47 +452,74 @@ impl AvroEngine {
 
     fn load_rules(&mut self) {
         let vowels: &[(&str, &str, &str)] = &[
-            ("a",   "আ", "া"),
-            ("aa",  "আ", "া"),
-            ("i",   "ই", "ি"),
-            ("ii",  "ঈ", "ী"),
-            ("u",   "উ", "ু"),
-            ("uu",  "ঊ", "ূ"),
-            ("e",   "এ", "ে"),
-            ("o",   "ও", "ো"),
-            ("O",   "ও", "ো"),
-            ("oi",  "ঐ", "ৈ"),
-            ("ou",  "ঔ", "ৌ"),
+            ("a", "আ", "া"),
+            ("aa", "আ", "া"),
+            ("i", "ই", "ি"),
+            ("ii", "ঈ", "ী"),
+            ("u", "উ", "ু"),
+            ("uu", "ঊ", "ূ"),
+            ("e", "এ", "ে"),
+            ("o", "ও", "ো"),
+            ("O", "ও", "ো"),
+            ("oi", "ঐ", "ৈ"),
+            ("ou", "ঔ", "ৌ"),
             ("rri", "ঋ", "ৃ"),
         ];
         for &(key, ind, dep) in vowels {
-            self.insert(key, BanglaOutput::Contextual {
-                independent: ind.to_string(),
-                dependent: dep.to_string(),
-            });
+            self.insert(
+                key,
+                BanglaOutput::Contextual {
+                    independent: ind.to_string(),
+                    dependent: dep.to_string(),
+                },
+            );
         }
 
         let consonants: &[(&str, &str)] = &[
-            ("k",   "ক"), ("kh",  "খ"),
-            ("g",   "গ"), ("gh",  "ঘ"), ("nga", "ঙ"),
-            ("c",   "চ"), ("ch",  "ছ"),
-            ("j",   "জ"), ("jh",  "ঝ"),
-            ("tt",  "ট"), ("T",   "ট"), ("tth", "ঠ"), ("Th",  "ঠ"),
-            ("dd",  "ড"), ("D",   "ড"), ("ddh", "ঢ"), ("Dh",  "ঢ"),
-            ("nn",  "ণ"), ("N",   "ণ"),
-            ("t",   "ত"), ("th",  "থ"),
-            ("d",   "দ"), ("dh",  "ধ"),
-            ("n",   "ন"),
-            ("p",   "প"), ("ph",  "ফ"), ("f",   "ফ"),
-            ("b",   "ব"), ("bh",  "ভ"), ("v",   "ভ"),
-            ("m",   "ম"),
-            ("z",   "য"), ("y",   "য়"),
-            ("r",   "র"), ("rr",  "ড়"), ("rrh", "ঢ়"),
-            ("l",   "ল"),
-            ("sh",  "শ"), ("ss",  "ষ"), ("S",   "ষ"), ("s",   "স"),
-            ("h",   "হ"),
-            ("ng",        "ং"),
-            ("nya",       "ঞ"),
+            ("k", "ক"),
+            ("kh", "খ"),
+            ("g", "গ"),
+            ("gh", "ঘ"),
+            ("nga", "ঙ"),
+            ("c", "চ"),
+            ("ch", "ছ"),
+            ("j", "জ"),
+            ("jh", "ঝ"),
+            ("tt", "ট"),
+            ("T", "ট"),
+            ("tth", "ঠ"),
+            ("Th", "ঠ"),
+            ("dd", "ড"),
+            ("D", "ড"),
+            ("ddh", "ঢ"),
+            ("Dh", "ঢ"),
+            ("nn", "ণ"),
+            ("N", "ণ"),
+            ("t", "ত"),
+            ("th", "থ"),
+            ("d", "দ"),
+            ("dh", "ধ"),
+            ("n", "ন"),
+            ("p", "প"),
+            ("ph", "ফ"),
+            ("f", "ফ"),
+            ("b", "ব"),
+            ("bh", "ভ"),
+            ("v", "ভ"),
+            ("m", "ম"),
+            ("z", "য"),
+            ("y", "য়"),
+            ("r", "র"),
+            ("rr", "ড়"),
+            ("rrh", "ঢ়"),
+            ("l", "ল"),
+            ("sh", "শ"),
+            ("ss", "ষ"),
+            ("S", "ষ"),
+            ("s", "স"),
+            ("h", "হ"),
+            ("ng", "ং"),
+            ("nya", "ঞ"),
             ("khandatta", "ৎ"),
         ];
         for &(key, val) in consonants {
@@ -437,7 +529,9 @@ impl AvroEngine {
 }
 
 impl Default for AvroEngine {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[cfg(test)]
@@ -448,40 +542,110 @@ mod tests {
 
     fn type_str(engine: &mut AvroEngine, s: &str) -> String {
         let mut preedit = String::new();
-        for c in s.chars() { preedit = engine.handle_input(c); }
+        for c in s.chars() {
+            preedit = engine.handle_input(c);
+        }
         preedit
     }
 
     // ── Hardcoded-rules tests ─────────────────────────────────────────────────
 
-    #[test] fn single_consonant() { assert_eq!(type_str(&mut AvroEngine::new(), "k"), "ক"); }
-    #[test] fn digraph_consonant() { assert_eq!(type_str(&mut AvroEngine::new(), "kh"), "খ"); }
-    #[test] fn consonant_then_vowel() { assert_eq!(type_str(&mut AvroEngine::new(), "ka"), "কা"); }
-    #[test] fn vowel_independent_at_start() { assert_eq!(type_str(&mut AvroEngine::new(), "a"), "আ"); }
-    #[test] fn vowel_dependent_after_consonant() { assert_eq!(type_str(&mut AvroEngine::new(), "ka"), "কা"); }
-    #[test] fn multiple_chars() { assert_eq!(type_str(&mut AvroEngine::new(), "kha"), "খা"); }
-    #[test] fn non_trie_char_is_literal() { assert_eq!(type_str(&mut AvroEngine::new(), "1"), "1"); }
-    #[test] fn word_eka() { assert_eq!(type_str(&mut AvroEngine::new(), "eka"), "একা"); }
-    #[test] fn ng_is_anusvara() { assert_eq!(type_str(&mut AvroEngine::new(), "ng"), "ং"); }
-    #[test] fn nga_is_nga_letter() { assert_eq!(type_str(&mut AvroEngine::new(), "nga"), "ঙ"); }
-    #[test] fn y_is_yo() { assert_eq!(type_str(&mut AvroEngine::new(), "y"), "য়"); }
-    #[test] fn z_is_jo() { assert_eq!(type_str(&mut AvroEngine::new(), "z"), "য"); }
-    #[test] fn capital_o_is_o_vowel() { assert_eq!(type_str(&mut AvroEngine::new(), "kO"), "কো"); }
-    #[test] fn rr_is_rra() { assert_eq!(type_str(&mut AvroEngine::new(), "rr"), "ড়"); }
-    #[test] fn word_bangla() { assert_eq!(type_str(&mut AvroEngine::new(), "bangla"), "বাংলা"); }
-    #[test] fn word_tomay() { assert_eq!(type_str(&mut AvroEngine::new(), "tOmay"), "তোমায়"); }
-    #[test] fn kha_not_broken_by_khandatta() { assert_eq!(type_str(&mut AvroEngine::new(), "kha"), "খা"); }
-    #[test] fn khandatta_gives_khanda_ta() { assert_eq!(type_str(&mut AvroEngine::new(), "khandatta"), "ৎ"); }
-    #[test] fn nya_gives_nyo() { assert_eq!(type_str(&mut AvroEngine::new(), "nya"), "ঞ"); }
-    #[test] fn ny_before_consonant() { assert_eq!(type_str(&mut AvroEngine::new(), "nyk"), "নয়ক"); }
+    #[test]
+    fn single_consonant() {
+        assert_eq!(type_str(&mut AvroEngine::new(), "k"), "ক");
+    }
+    #[test]
+    fn digraph_consonant() {
+        assert_eq!(type_str(&mut AvroEngine::new(), "kh"), "খ");
+    }
+    #[test]
+    fn consonant_then_vowel() {
+        assert_eq!(type_str(&mut AvroEngine::new(), "ka"), "কা");
+    }
+    #[test]
+    fn vowel_independent_at_start() {
+        assert_eq!(type_str(&mut AvroEngine::new(), "a"), "আ");
+    }
+    #[test]
+    fn vowel_dependent_after_consonant() {
+        assert_eq!(type_str(&mut AvroEngine::new(), "ka"), "কা");
+    }
+    #[test]
+    fn multiple_chars() {
+        assert_eq!(type_str(&mut AvroEngine::new(), "kha"), "খা");
+    }
+    #[test]
+    fn non_trie_char_is_literal() {
+        assert_eq!(type_str(&mut AvroEngine::new(), "1"), "1");
+    }
+    #[test]
+    fn word_eka() {
+        assert_eq!(type_str(&mut AvroEngine::new(), "eka"), "একা");
+    }
+    #[test]
+    fn ng_is_anusvara() {
+        assert_eq!(type_str(&mut AvroEngine::new(), "ng"), "ং");
+    }
+    #[test]
+    fn nga_is_nga_letter() {
+        assert_eq!(type_str(&mut AvroEngine::new(), "nga"), "ঙ");
+    }
+    #[test]
+    fn y_is_yo() {
+        assert_eq!(type_str(&mut AvroEngine::new(), "y"), "য়");
+    }
+    #[test]
+    fn z_is_jo() {
+        assert_eq!(type_str(&mut AvroEngine::new(), "z"), "য");
+    }
+    #[test]
+    fn capital_o_is_o_vowel() {
+        assert_eq!(type_str(&mut AvroEngine::new(), "kO"), "কো");
+    }
+    #[test]
+    fn rr_is_rra() {
+        assert_eq!(type_str(&mut AvroEngine::new(), "rr"), "ড়");
+    }
+    #[test]
+    fn word_bangla() {
+        assert_eq!(type_str(&mut AvroEngine::new(), "bangla"), "বাংলা");
+    }
+    #[test]
+    fn word_tomay() {
+        assert_eq!(type_str(&mut AvroEngine::new(), "tOmay"), "তোমায়");
+    }
+    #[test]
+    fn kha_not_broken_by_khandatta() {
+        assert_eq!(type_str(&mut AvroEngine::new(), "kha"), "খা");
+    }
+    #[test]
+    fn khandatta_gives_khanda_ta() {
+        assert_eq!(type_str(&mut AvroEngine::new(), "khandatta"), "ৎ");
+    }
+    #[test]
+    fn nya_gives_nyo() {
+        assert_eq!(type_str(&mut AvroEngine::new(), "nya"), "ঞ");
+    }
+    #[test]
+    fn ny_before_consonant() {
+        assert_eq!(type_str(&mut AvroEngine::new(), "nyk"), "নয়ক");
+    }
 
     #[test]
     fn anthem_phrase() {
         for (phonetic, expected) in [
-            ("amar", "আমার"), ("sonar", "সোনার"), ("bangla", "বাংলা"),
-            ("ami", "আমি"), ("tOmay", "তোমায়"), ("valObasi", "ভালোবাসি"),
+            ("amar", "আমার"),
+            ("sonar", "সোনার"),
+            ("bangla", "বাংলা"),
+            ("ami", "আমি"),
+            ("tOmay", "তোমায়"),
+            ("valObasi", "ভালোবাসি"),
         ] {
-            assert_eq!(type_str(&mut AvroEngine::new(), phonetic), expected, "failed on '{phonetic}'");
+            assert_eq!(
+                type_str(&mut AvroEngine::new(), phonetic),
+                expected,
+                "failed on '{phonetic}'"
+            );
         }
     }
 
@@ -650,8 +814,12 @@ mod tests {
 
     #[test]
     fn suggest_extended_strips_suffix() {
-        let Some(wdict) = load_word_dict() else { return };
-        let Some(sdict) = load_suffix_dict() else { return };
+        let Some(wdict) = load_word_dict() else {
+            return;
+        };
+        let Some(sdict) = load_suffix_dict() else {
+            return;
+        };
         let mut e = AvroEngine::new();
         e.load_dict(wdict);
         e.load_suffix_dict(sdict);
@@ -666,7 +834,9 @@ mod tests {
 
     #[test]
     fn suggest_extended_falls_back_without_suffix_dict() {
-        let Some(wdict) = load_word_dict() else { return };
+        let Some(wdict) = load_word_dict() else {
+            return;
+        };
         let mut e = AvroEngine::new();
         e.load_dict(wdict);
         type_str(&mut e, "k");

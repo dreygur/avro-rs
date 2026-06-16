@@ -91,7 +91,9 @@ mod tests {
 
     #[test]
     fn word_dict_parses() {
-        let Some(src) = load("../../avrodict.js") else { return };
+        let Some(src) = load("../../avrodict.js") else {
+            return;
+        };
         let dict = WordDict::from_js(&src).unwrap();
         assert_eq!(dict.keys().count(), 47);
         assert!(!dict.words_for("w_k").is_empty());
@@ -100,14 +102,18 @@ mod tests {
 
     #[test]
     fn word_dict_total_entries() {
-        let Some(src) = load("../../avrodict.js") else { return };
+        let Some(src) = load("../../avrodict.js") else {
+            return;
+        };
         let dict = WordDict::from_js(&src).unwrap();
         assert!(dict.total_words() > 100_000);
     }
 
     #[test]
     fn suffix_dict_parses() {
-        let Some(src) = load("../../suffixdict.js") else { return };
+        let Some(src) = load("../../suffixdict.js") else {
+            return;
+        };
         let dict = SuffixDict::from_js(&src).unwrap();
         assert_eq!(dict.bangla_for("e"), Some("ে"));
         assert_eq!(dict.bangla_for("er"), Some("ের"));

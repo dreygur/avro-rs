@@ -3,9 +3,15 @@ use std::collections::HashMap;
 #[derive(Debug, Clone)]
 pub enum BanglaOutput {
     Static(String),
-    Contextual { independent: String, dependent: String },
+    Contextual {
+        independent: String,
+        dependent: String,
+    },
     /// Rules from JSON grammar; first matching rule wins, `fallback` is used when none match.
-    Conditional { rules: Vec<ConditionalRule>, fallback: String },
+    Conditional {
+        rules: Vec<ConditionalRule>,
+        fallback: String,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -57,6 +63,9 @@ pub(crate) struct TrieNode {
 
 impl TrieNode {
     pub fn new() -> Self {
-        Self { output: None, children: HashMap::new() }
+        Self {
+            output: None,
+            children: HashMap::new(),
+        }
     }
 }

@@ -1,7 +1,6 @@
+use avro_core::AvroEngine;
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int};
-use avro_core::{AvroEngine, AvroGrammar};
-use avro_core::dict::{SuffixDict, WordDict};
 
 pub struct AvroState {
     engine: AvroEngine,
@@ -23,13 +22,18 @@ pub extern "C" fn avro_state_new(
     suffix_path: *const c_char,
 ) -> *mut AvroState {
     let engine = load_engine(grammar_path, dict_path, suffix_path);
-    Box::into_raw(Box::new(AvroState { engine, suggestions: Vec::new() }))
+    Box::into_raw(Box::new(AvroState {
+        engine,
+        suggestions: Vec::new(),
+    }))
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn avro_state_free(state: *mut AvroState) {
     if !state.is_null() {
-        unsafe { drop(Box::from_raw(state)); }
+        unsafe {
+            drop(Box::from_raw(state));
+        }
     }
 }
 
@@ -38,7 +42,9 @@ pub extern "C" fn avro_state_free(state: *mut AvroState) {
 /// Returns a NUL-terminated preedit string. Caller must free with `avro_str_free`.
 #[unsafe(no_mangle)]
 pub extern "C" fn avro_handle_input(state: *mut AvroState, ch: u32) -> *mut c_char {
-    let Some(c) = char::from_u32(ch) else { return std::ptr::null_mut() };
+    let Some(c) = char::from_u32(ch) else {
+        return std::ptr::null_mut();
+    };
     let state = unsafe { &mut *state };
     state.engine.handle_input(c);
     state.refresh_suggestions();
@@ -67,7 +73,11 @@ pub extern "C" fn avro_commit(state: *mut AvroState) -> *mut c_char {
 #[unsafe(no_mangle)]
 pub extern "C" fn avro_commit_suggestion(state: *mut AvroState, index: c_int) -> *mut c_char {
     let state = unsafe { &mut *state };
-    let word = state.suggestions.get(index as usize).cloned().unwrap_or_default();
+    let word = state
+        .suggestions
+        .get(index as usize)
+        .cloned()
+        .unwrap_or_default();
     state.engine.commit();
     state.suggestions.clear();
     to_cstring(word)
@@ -78,7 +88,11 @@ pub extern "C" fn avro_commit_suggestion(state: *mut AvroState, index: c_int) ->
 #[unsafe(no_mangle)]
 pub extern "C" fn avro_has_preedit(state: *const AvroState) -> c_int {
     let state = unsafe { &*state };
-    if state.engine.preedit().is_empty() { 0 } else { 1 }
+    if state.engine.preedit().is_empty() {
+        0
+    } else {
+        1
+    }
 }
 
 /// Returns current preedit string. Caller must free with `avro_str_free`.
@@ -111,7 +125,9 @@ pub extern "C" fn avro_suggest_get(state: *const AvroState, index: c_int) -> *mu
 #[unsafe(no_mangle)]
 pub extern "C" fn avro_str_free(ptr: *mut c_char) {
     if !ptr.is_null() {
-        unsafe { drop(CString::from_raw(ptr)); }
+        unsafe {
+            drop(CString::from_raw(ptr));
+        }
     }
 }
 
@@ -121,43 +137,25 @@ fn to_cstring(s: String) -> *mut c_char {
     CString::new(s).unwrap_or_default().into_raw()
 }
 
+fn read_source(path: *const c_char) -> Option<String> {
+    if path.is_null() {
+        return None;
+    }
+    let path = unsafe { CStr::from_ptr(path) }.to_string_lossy();
+    std::fs::read_to_string(path.as_ref()).ok()
+}
+
 fn load_engine(
     grammar_path: *const c_char,
     dict_path: *const c_char,
     suffix_path: *const c_char,
 ) -> AvroEngine {
-    let mut engine = if !grammar_path.is_null() {
-        let path = unsafe { CStr::from_ptr(grammar_path) }.to_string_lossy();
-        if let Ok(src) = std::fs::read_to_string(path.as_ref()) {
-            if let Ok(grammar) = AvroGrammar::from_json(&src) {
-                AvroEngine::from_grammar(&grammar)
-            } else {
-                AvroEngine::new()
-            }
-        } else {
-            AvroEngine::new()
-        }
-    } else {
-        AvroEngine::new()
-    };
-
-    if !dict_path.is_null() {
-        let path = unsafe { CStr::from_ptr(dict_path) }.to_string_lossy();
-        if let Ok(src) = std::fs::read_to_string(path.as_ref()) {
-            if let Ok(dict) = WordDict::from_js(&src) {
-                engine.load_dict(dict);
-            }
-        }
-    }
-
-    if !suffix_path.is_null() {
-        let path = unsafe { CStr::from_ptr(suffix_path) }.to_string_lossy();
-        if let Ok(src) = std::fs::read_to_string(path.as_ref()) {
-            if let Ok(dict) = SuffixDict::from_js(&src) {
-                engine.load_suffix_dict(dict);
-            }
-        }
-    }
-
-    engine
+    let grammar_src = read_source(grammar_path);
+    let dict_src = read_source(dict_path);
+    let suffix_src = read_source(suffix_path);
+    AvroEngine::from_sources(
+        grammar_src.as_deref(),
+        dict_src.as_deref(),
+        suffix_src.as_deref(),
+    )
 }

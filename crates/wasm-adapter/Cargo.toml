@@ -1,0 +1,11 @@
+[package]
+name = "wasm-adapter"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+avro-core = { path = "../avro-core" }
+wasm-bindgen = "0.2"

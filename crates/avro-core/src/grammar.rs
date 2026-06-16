@@ -1,5 +1,5 @@
-use serde::Deserialize;
 use crate::types::{BanglaOutput, CharClass, ConditionalRule, MatchCond, ScopeCheck};
+use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
 pub struct AvroGrammar {
@@ -56,17 +56,28 @@ impl AvroGrammar {
             let output = if p.rules.is_empty() {
                 BanglaOutput::Static(p.replace.clone())
             } else {
-                let rules = p.rules.iter().map(|r| ConditionalRule {
-                    matches: r.matches.iter().map(|m| {
-                        let scope = parse_scope(&m.scope, m.value.as_deref());
-                        match m.match_type {
-                            GrammarMatchType::Prefix => MatchCond::Prefix(scope),
-                            GrammarMatchType::Suffix => MatchCond::Suffix(scope),
-                        }
-                    }).collect(),
-                    replace: r.replace.clone(),
-                }).collect();
-                BanglaOutput::Conditional { rules, fallback: p.replace.clone() }
+                let rules = p
+                    .rules
+                    .iter()
+                    .map(|r| ConditionalRule {
+                        matches: r
+                            .matches
+                            .iter()
+                            .map(|m| {
+                                let scope = parse_scope(&m.scope, m.value.as_deref());
+                                match m.match_type {
+                                    GrammarMatchType::Prefix => MatchCond::Prefix(scope),
+                                    GrammarMatchType::Suffix => MatchCond::Suffix(scope),
+                                }
+                            })
+                            .collect(),
+                        replace: r.replace.clone(),
+                    })
+                    .collect();
+                BanglaOutput::Conditional {
+                    rules,
+                    fallback: p.replace.clone(),
+                }
             };
             (p.find.as_str(), output)
         })
@@ -75,17 +86,17 @@ impl AvroGrammar {
 
 fn parse_scope(scope: &str, value: Option<&str>) -> ScopeCheck {
     match scope {
-        "consonant"    => ScopeCheck::IsClass(CharClass::Consonant),
-        "!consonant"   => ScopeCheck::NotClass(CharClass::Consonant),
-        "vowel"        => ScopeCheck::IsClass(CharClass::Vowel),
-        "!vowel"       => ScopeCheck::NotClass(CharClass::Vowel),
-        "number"       => ScopeCheck::IsClass(CharClass::Number),
-        "!number"      => ScopeCheck::NotClass(CharClass::Number),
-        "punctuation"  => ScopeCheck::IsClass(CharClass::Punctuation),
+        "consonant" => ScopeCheck::IsClass(CharClass::Consonant),
+        "!consonant" => ScopeCheck::NotClass(CharClass::Consonant),
+        "vowel" => ScopeCheck::IsClass(CharClass::Vowel),
+        "!vowel" => ScopeCheck::NotClass(CharClass::Vowel),
+        "number" => ScopeCheck::IsClass(CharClass::Number),
+        "!number" => ScopeCheck::NotClass(CharClass::Number),
+        "punctuation" => ScopeCheck::IsClass(CharClass::Punctuation),
         "!punctuation" => ScopeCheck::NotClass(CharClass::Punctuation),
-        "exact"        => ScopeCheck::IsExact(value.unwrap_or("").to_string()),
-        "!exact"       => ScopeCheck::NotExact(value.unwrap_or("").to_string()),
-        _              => ScopeCheck::IsClass(CharClass::Punctuation),
+        "exact" => ScopeCheck::IsExact(value.unwrap_or("").to_string()),
+        "!exact" => ScopeCheck::NotExact(value.unwrap_or("").to_string()),
+        _ => ScopeCheck::IsClass(CharClass::Punctuation),
     }
 }
 
@@ -118,7 +129,13 @@ mod tests {
     fn conditional_patterns_parse() {
         let Some(g) = load() else { return };
         let outputs: Vec<_> = g.patterns_as_outputs().collect();
-        let cond_count = outputs.iter().filter(|(_, o)| matches!(o, BanglaOutput::Conditional { .. })).count();
-        assert!(cond_count > 10, "expected conditional patterns, got {cond_count}");
+        let cond_count = outputs
+            .iter()
+            .filter(|(_, o)| matches!(o, BanglaOutput::Conditional { .. }))
+            .count();
+        assert!(
+            cond_count > 10,
+            "expected conditional patterns, got {cond_count}"
+        );
     }
 }

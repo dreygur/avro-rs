@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/avro-core", "crates/avro-repl", "crates/fcitx5-adapter"]
+members = ["crates/avro-core", "crates/avro-repl", "crates/fcitx5-adapter", "crates/wasm-adapter"]
 
 [workspace.package]
 version = "0.1.0"
