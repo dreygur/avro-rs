@@ -5,12 +5,30 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Avro Typing Pad</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=Noto+Serif+Bengali:wght@400;600&family=Outfit:wght@400;500;600;700&display=swap"
+  rel="stylesheet"
+/>
 <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+<div class="aurora" aria-hidden="true">
+  <span class="blob blob-a"></span>
+  <span class="blob blob-b"></span>
+  <span class="blob blob-c"></span>
+</div>
+
 <div class="app">
   <header class="topbar">
-    <h1>Avro Typing Pad</h1>
+    <div class="brand">
+      <span class="brand-mark">অ</span>
+      <div class="brand-text">
+        <h1>Avro Typing Pad</h1>
+        <p class="tagline">phonetic Bangla, typed in light</p>
+      </div>
+    </div>
     <label class="toggle">
       <span>EN</span>
       <input type="checkbox" id="lang-toggle" checked />
@@ -21,14 +39,16 @@
 
   <main class="main">
     <section class="editor-col">
-      <div id="canvas" class="canvas" tabindex="0" aria-label="Typing canvas"></div>
+      <div class="canvas-frame">
+        <div id="canvas" class="canvas" tabindex="0" aria-label="Typing canvas" data-placeholder="টাইপ করা শুরু করুন…"></div>
+      </div>
 
       <div id="suggestions" class="suggestions" aria-label="Suggestions"></div>
 
       <div class="toolbar">
-        <button id="clear-btn" type="button">Clear</button>
-        <button id="copy-btn" type="button">Copy</button>
-        <button id="save-draft-btn" type="button">Save draft</button>
+        <button id="clear-btn" type="button" class="btn">Clear</button>
+        <button id="copy-btn" type="button" class="btn">Copy</button>
+        <button id="save-draft-btn" type="button" class="btn btn-accent">Save draft</button>
         <span id="dict-status" class="dict-status">Loading suggestions&hellip;</span>
       </div>
     </section>

@@ -28,6 +28,7 @@ function render() {
     preeditSpan.textContent = preedit;
     canvasEl.appendChild(preeditSpan);
   }
+  canvasEl.classList.toggle("is-empty", committed.length === 0 && preedit.length === 0);
 
   suggestionsEl.textContent = "";
   suggestions.forEach((word, i) => {
