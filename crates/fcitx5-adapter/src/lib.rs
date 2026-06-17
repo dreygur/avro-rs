@@ -2,6 +2,8 @@ use avro_core::AvroEngine;
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int};
 
+mod ipc;
+
 pub struct AvroState {
     engine: AvroEngine,
     suggestions: Vec<String>,
@@ -118,6 +120,48 @@ pub extern "C" fn avro_suggest_get(state: *const AvroState, index: c_int) -> *mu
         Some(s) => to_cstring(s.clone()),
         None => std::ptr::null_mut(),
     }
+}
+
+// ── Overlay IPC ──────────────────────────────────────────────────────────────
+
+/// Broadcasts current preedit/suggestions plus the focused text cursor's
+/// screen rect (from `fcitx::InputContext::cursorRect()`) to any connected
+/// overlay-adapter clients.
+#[unsafe(no_mangle)]
+pub extern "C" fn avro_publish_overlay_state(
+    state: *const AvroState,
+    cursor_x: c_int,
+    cursor_y: c_int,
+    cursor_w: c_int,
+    cursor_h: c_int,
+) {
+    let state = unsafe { &*state };
+    let preedit = state.engine.preedit();
+    ipc::publish(
+        &preedit,
+        &state.suggestions,
+        ipc::CursorRect {
+            x: cursor_x,
+            y: cursor_y,
+            w: cursor_w,
+            h: cursor_h,
+        },
+    );
+}
+
+/// Spawns the standalone overlay-adapter process if it isn't already running.
+/// Idempotent — safe to call from `AvroPhoneticEngine`'s constructor every
+/// time the addon loads.
+#[unsafe(no_mangle)]
+pub extern "C" fn avro_overlay_spawn() {
+    ipc::spawn_overlay();
+}
+
+/// Terminates the overlay-adapter process previously started by
+/// `avro_overlay_spawn`, if any.
+#[unsafe(no_mangle)]
+pub extern "C" fn avro_overlay_stop() {
+    ipc::stop_overlay();
 }
 
 // ── Memory ───────────────────────────────────────────────────────────────────

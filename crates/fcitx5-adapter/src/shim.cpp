@@ -34,6 +34,9 @@ extern "C" {
     int        avro_suggest_count(const AvroState *);
     char      *avro_suggest_get(const AvroState *, int index);
     void       avro_str_free(char *);
+    void       avro_publish_overlay_state(const AvroState *, int x, int y, int w, int h);
+    void       avro_overlay_spawn();
+    void       avro_overlay_stop();
 }
 
 // ── RAII wrapper for Rust-owned C strings ───────────────────────────────────
@@ -64,6 +67,23 @@ private:
     AvroState *state_;
 };
 
+// ── Shared panel/overlay reset ──────────────────────────────────────────────
+
+static void publishOverlay(fcitx::InputContext *ic, AvroState *state) {
+    const auto &rect = ic->cursorRect();
+    avro_publish_overlay_state(state, rect.left(), rect.top(), rect.width(), rect.height());
+}
+
+// Clears fcitx5's own preedit/candidate panel and publishes the (now empty)
+// state to the overlay-adapter, so a floating overlay window hides itself
+// alongside fcitx5's own UI.
+static void clearPanel(fcitx::InputContext *ic, AvroState *state) {
+    ic->inputPanel().reset();
+    ic->updatePreedit();
+    ic->updateUserInterface(fcitx::UserInterfaceComponent::InputPanel);
+    publishOverlay(ic, state);
+}
+
 // ── Candidate word ───────────────────────────────────────────────────────────
 
 class AvroCandidateWord : public fcitx::CandidateWord {
@@ -76,9 +96,7 @@ public:
     void select(fcitx::InputContext *ic) const override {
         RustStr committed(avro_commit_suggestion(state_, index_));
         ic->commitString(committed.str());
-        ic->inputPanel().reset();
-        ic->updatePreedit();
-        ic->updateUserInterface(fcitx::UserInterfaceComponent::InputPanel);
+        clearPanel(ic, state_);
     }
 
 private:
@@ -93,7 +111,10 @@ public:
     explicit AvroPhoneticEngine(fcitx::AddonManager *manager) {
         manager->instance()->inputContextManager()
                .registerProperty("avroPhonetic", &factory_);
+        avro_overlay_spawn();
     }
+
+    ~AvroPhoneticEngine() override { avro_overlay_stop(); }
 
     std::vector<fcitx::InputMethodEntry> listInputMethods() override {
         std::vector<fcitx::InputMethodEntry> entries;
@@ -112,9 +133,7 @@ public:
         auto *ic = event.inputContext();
         auto *prop = ic->propertyFor(&factory_);
         avro_commit(prop->state()); // discard uncommitted text
-        ic->inputPanel().reset();
-        ic->updatePreedit();
-        ic->updateUserInterface(fcitx::UserInterfaceComponent::InputPanel);
+        clearPanel(ic, prop->state());
     }
 
     void keyEvent(const fcitx::InputMethodEntry &, fcitx::KeyEvent &event) override {
@@ -141,9 +160,7 @@ public:
             std::string out = committed.str();
             if (key.check(FcitxKey_space)) out += ' ';
             ic->commitString(out);
-            ic->inputPanel().reset();
-            ic->updatePreedit();
-            ic->updateUserInterface(fcitx::UserInterfaceComponent::InputPanel);
+            clearPanel(ic, state);
             return;
         }
 
@@ -151,9 +168,7 @@ public:
             if (!avro_has_preedit(state)) return;
             event.accept();
             RustStr discard(avro_commit(state));
-            ic->inputPanel().reset();
-            ic->updatePreedit();
-            ic->updateUserInterface(fcitx::UserInterfaceComponent::InputPanel);
+            clearPanel(ic, state);
             return;
         }
 
@@ -165,9 +180,7 @@ public:
                 event.accept();
                 RustStr committed(avro_commit_suggestion(state, idx));
                 ic->commitString(committed.str());
-                ic->inputPanel().reset();
-                ic->updatePreedit();
-                ic->updateUserInterface(fcitx::UserInterfaceComponent::InputPanel);
+                clearPanel(ic, state);
                 return;
             }
         }
@@ -206,6 +219,7 @@ private:
 
         ic->updatePreedit();
         ic->updateUserInterface(fcitx::UserInterfaceComponent::InputPanel);
+        publishOverlay(ic, state);
     }
 };
 

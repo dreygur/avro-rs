@@ -8,18 +8,27 @@ FCITX5_DATA  ?= $(PREFIX)/share/fcitx5
 LIB_RELEASE  := target/release/libfcitx5_adapter.so
 LIB_NAME     := libfcitx5-adapter.so
 
-PKGDATADIR   := $(FCITX5_DATA)/avro
+PKGDATADIR      := $(FCITX5_DATA)/avro
+PKGLIBEXECDIR   ?= $(LIBDIR)/avro
+
+OVERLAY_BIN     := $(PKGLIBEXECDIR)/overlay-adapter
+OVERLAY_RELEASE := target/release/overlay-adapter
 
 WASM_PKG_DIR := crates/wasm-adapter/pkg
 WEB_DATA_DIR := crates/wasm-adapter/web/data
 
-.PHONY: all build install uninstall clean wasm web
+.PHONY: all build install uninstall clean wasm web overlay
 
 all: build
 
 # Run as your regular user — cargo must not be invoked under sudo.
 build:
-	PKGDATADIR=$(PKGDATADIR) $(CARGO) build -p fcitx5-adapter --release
+	PKGDATADIR=$(PKGDATADIR) OVERLAY_BIN=$(OVERLAY_BIN) \
+		$(CARGO) build -p fcitx5-adapter --release
+	$(CARGO) build -p overlay-adapter --release
+
+overlay:
+	$(CARGO) build -p overlay-adapter --release
 
 # Builds the npm package for wasm-adapter into crates/wasm-adapter/pkg.
 # Requires 'wasm-bindgen-cli' installed at the version pinned in Cargo.lock.
@@ -36,7 +45,7 @@ web: wasm
 	$(INSTALL) -Dm644 suffixdict.js  $(WEB_DATA_DIR)/suffixdict.js
 
 # Run as root (sudo make install). Requires 'make build' to have been run first.
-install: $(LIB_RELEASE)
+install: $(LIB_RELEASE) $(OVERLAY_RELEASE)
 	$(INSTALL) -Dm755 $(LIB_RELEASE) $(DESTDIR)$(FCITX5_ADDON)/$(LIB_NAME)
 	$(INSTALL) -Dm644 dist/addon/AvroPhonetic.conf \
 		$(DESTDIR)$(FCITX5_DATA)/addon/AvroPhonetic.conf
@@ -46,9 +55,14 @@ install: $(LIB_RELEASE)
 	$(INSTALL) -Dm644 avro.json      $(DESTDIR)$(PKGDATADIR)/avrophonetic.json
 	$(INSTALL) -Dm644 avrodict.js    $(DESTDIR)$(PKGDATADIR)/avrodict.js
 	$(INSTALL) -Dm644 suffixdict.js  $(DESTDIR)$(PKGDATADIR)/suffixdict.js
+	$(INSTALL) -Dm755 $(OVERLAY_RELEASE) $(DESTDIR)$(OVERLAY_BIN)
 	@echo "Installed. Restart fcitx5 and enable 'Avro Phonetic' in fcitx5-configtool."
 
 $(LIB_RELEASE):
+	@echo "Run 'make build' as your regular user before 'sudo make install'."
+	@exit 1
+
+$(OVERLAY_RELEASE):
 	@echo "Run 'make build' as your regular user before 'sudo make install'."
 	@exit 1
 
@@ -57,6 +71,7 @@ uninstall:
 	rm -f  $(DESTDIR)$(FCITX5_DATA)/addon/AvroPhonetic.conf
 	rm -f  $(DESTDIR)$(FCITX5_DATA)/inputmethod/avro.conf
 	rm -rf $(DESTDIR)$(PKGDATADIR)
+	rm -f  $(DESTDIR)$(OVERLAY_BIN)
 
 clean:
 	$(CARGO) clean

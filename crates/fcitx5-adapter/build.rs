@@ -15,6 +15,13 @@ fn main() {
         std::env::var("PKGDATADIR").unwrap_or_else(|_| "/usr/share/fcitx5/avro".to_string());
     build.define("PKGDATADIR", Some(format!("\"{pkgdatadir}\"").as_str()));
 
+    // Allow caller to override the overlay-adapter binary path via env (used
+    // by the Makefile). Exposed to Rust too, since the spawn/kill logic for
+    // the overlay process lives in lib.rs/ipc.rs, not the C++ shim.
+    let overlay_bin =
+        std::env::var("OVERLAY_BIN").unwrap_or_else(|_| "/usr/libexec/avro/overlay-adapter".to_string());
+    println!("cargo:rustc-env=OVERLAY_BIN={overlay_bin}");
+
     for path in fcitx_core
         .include_paths
         .iter()

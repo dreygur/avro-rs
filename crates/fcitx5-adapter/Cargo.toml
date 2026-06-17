@@ -8,6 +8,8 @@ crate-type = ["cdylib"]
 
 [dependencies]
 avro-core = { path = "../avro-core" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 
 [build-dependencies]
 cc = "1"
